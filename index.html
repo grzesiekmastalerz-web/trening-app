@@ -505,22 +505,61 @@ function showSummary() {
   const sess = loadSession(currentDate);
   const totalTime = sess?.totalSeconds || 0;
 
-  // Calculate totals
-  let totalVolume = 0;
-  let totalSets = 0;
-  exercises.forEach(ex => {
+  // Per-exercise breakdown
+  let totalVolume = 0, totalSets = 0, totalRestSec = 0, totalRestCount = 0;
+  let exBreakdown = [];
+
+  exercises.forEach((ex, idx) => {
     const saved = loadSets(ex.id, currentDate);
     if (!saved) return;
+    let exVol = 0, exSets = 0, exRestSec = 0, exRestCount = 0, exMaxWeight = 0;
+    let setsDetail = [];
+
     for (let s = 1; s <= ex.sets; s++) {
       const d = saved[`s${s}`];
-      if (!d || !d.done) continue;
-      totalSets++;
+      if (!d) continue;
+      if (d.done) exSets++;
+      if (d.rest) { exRestSec += d.rest; exRestCount++; totalRestSec += d.rest; totalRestCount++; }
+
       if (ex.type === 'weight' && d.weight) {
-        const reps = ex.bilateral ? Math.max(+(d.repsL||0), +(d.repsR||0)) : +(d.reps||0);
-        totalVolume += (+d.weight) * reps;
+        const w = +d.weight;
+        if (w > exMaxWeight) exMaxWeight = w;
+        if (ex.bilateral) {
+          const rL = +(d.repsL||0), rR = +(d.repsR||0);
+          exVol += w * (rL + rR);
+          setsDetail.push(`${w}kg × ${rL}L/${rR}R`);
+        } else {
+          const r = +(d.reps||0);
+          exVol += w * r;
+          setsDetail.push(`${w}kg × ${r}`);
+        }
+      } else if (ex.type === 'time') {
+        if (ex.bilateral) setsDetail.push(`${d.left||0}/${d.right||0}s`);
+        else setsDetail.push(`${d.time||0}s`);
       }
     }
+    totalVolume += exVol;
+    totalSets += exSets;
+
+    exBreakdown.push({ name: ex.name, type: ex.type, sets: exSets, totalSets: ex.sets, vol: exVol, maxWeight: exMaxWeight, restSec: exRestSec, restCount: exRestCount, detail: setsDetail });
   });
+
+  // Transition times
+  let totalTransSec = 0, transCount = 0;
+  let transItems = [];
+  if (sess?.transitions) {
+    Object.entries(sess.transitions).forEach(([key, sec]) => {
+      const [from, to] = key.split('-').map(Number);
+      totalTransSec += sec;
+      transCount++;
+      transItems.push({ from: exercises[from]?.name || `#${from}`, to: exercises[to]?.name || `#${to}`, sec });
+    });
+  }
+
+  const totalBreakSec = totalRestSec + totalTransSec;
+  const workTime = totalTime - totalBreakSec;
+  const avgRest = totalRestCount > 0 ? Math.round(totalRestSec / totalRestCount) : 0;
+  const avgTrans = transCount > 0 ? Math.round(totalTransSec / transCount) : 0;
 
   // Compare with last session
   const prevDates = [];
@@ -533,15 +572,16 @@ function showSummary() {
 
   let compHtml = '';
   if (prevDate) {
+    const prevSess = loadSession(prevDate);
     let prevVolume = 0;
     exercises.forEach(ex => {
       const saved = loadSets(ex.id, prevDate);
       if (!saved) return;
       for (let s = 1; s <= ex.sets; s++) {
         const d = saved[`s${s}`];
-        if (!d) continue;
-        if (ex.type === 'weight' && d.weight) {
-          const reps = ex.bilateral ? Math.max(+(d.repsL||0), +(d.repsR||0)) : +(d.reps||0);
+        if (!d || ex.type === 'time') continue;
+        if (d.weight) {
+          const reps = ex.bilateral ? (+(d.repsL||0) + +(d.repsR||0)) : +(d.reps||0);
           prevVolume += (+d.weight) * reps;
         }
       }
@@ -550,65 +590,96 @@ function showSummary() {
     const volDiff = totalVolume - prevVolume;
     const volClass = volDiff > 0 ? 'up' : volDiff < 0 ? 'down' : '';
     const volSign = volDiff > 0 ? '+' : '';
+    const timeDiff = prevSess?.totalSeconds ? totalTime - prevSess.totalSeconds : 0;
+    const timeClass = timeDiff < 0 ? 'up' : timeDiff > 0 ? 'down' : '';
+    const timeSign = timeDiff > 0 ? '+' : '';
 
-    compHtml = `
-      <div class="summary-stat">
-        <span class="label">vs ostatni trening</span>
-        <span class="value ${volClass}">${volSign}${Math.round(volDiff)} kg wolumenu</span>
-      </div>`;
+    compHtml = `<div style="margin-top:20px;padding:12px;background:var(--card);border-radius:10px;border:1px solid var(--border)">
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px;color:var(--accent)">vs ostatni trening (${formatDate(prevDate)})</div>
+      <div class="summary-stat"><span class="label">Wolumen</span><span class="value ${volClass}">${volSign}${Math.round(volDiff)} kg</span></div>
+      ${prevSess?.totalSeconds ? `<div class="summary-stat"><span class="label">Czas</span><span class="value ${timeClass}">${timeSign}${fmtTime(Math.abs(timeDiff))}</span></div>` : ''}`;
 
-    // Per-exercise comparison
-    compHtml += '<div class="summary-ex"><h3>Porownanie cwiczen</h3>';
+    // Per-exercise max weight comparison
+    compHtml += '<div style="margin-top:8px">';
     exercises.forEach(ex => {
+      if (ex.type === 'time') return;
       const curr = loadSets(ex.id, currentDate);
       const prev = loadSets(ex.id, prevDate);
-      if (!curr || ex.type === 'time') return;
-
+      if (!curr) return;
       let currMax = 0, prevMax = 0;
       for (let s = 1; s <= ex.sets; s++) {
-        const cd = curr[`s${s}`];
-        if (cd?.weight) currMax = Math.max(currMax, +cd.weight);
-        const pd = prev?.[`s${s}`];
-        if (pd?.weight) prevMax = Math.max(prevMax, +pd.weight);
+        if (curr[`s${s}`]?.weight) currMax = Math.max(currMax, +curr[`s${s}`].weight);
+        if (prev?.[`s${s}`]?.weight) prevMax = Math.max(prevMax, +prev[`s${s}`].weight);
       }
       if (currMax === 0 && prevMax === 0) return;
       const diff = currMax - prevMax;
       const cls = diff > 0 ? 'up' : diff < 0 ? 'down' : '';
       const sign = diff > 0 ? '+' : '';
-      compHtml += `<div class="comp">${ex.name}: ${currMax}kg <span class="value ${cls}">(${sign}${diff}kg)</span></div>`;
+      compHtml += `<div style="font-size:12px;color:var(--muted);padding:2px 0">${ex.name}: <strong>${currMax}kg</strong> <span class="value ${cls}" style="font-size:11px">(${sign}${diff})</span></div>`;
     });
-    compHtml += '</div>';
+    compHtml += '</div></div>';
   }
 
-  // Transition times
-  let transHtml = '';
-  if (sess?.transitions && Object.keys(sess.transitions).length) {
-    transHtml = '<div class="summary-ex"><h3>Przerwy miedzy cwiczeniami</h3>';
-    Object.entries(sess.transitions).forEach(([key, sec]) => {
-      const [from, to] = key.split('-').map(Number);
-      transHtml += `<div class="comp">${exercises[from].name} → ${exercises[to].name}: ${fmtTime(sec)}</div>`;
+  // Build summary HTML
+  let html = `<h2 style="margin-bottom:20px">Trening zakonczony!</h2>`;
+
+  // Time overview
+  html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:11px;color:var(--muted)">Calkowity czas</div>
+      <div style="font-size:24px;font-weight:800;color:var(--accent)">${fmtTime(totalTime)}</div>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:11px;color:var(--muted)">Czas pracy</div>
+      <div style="font-size:24px;font-weight:800;color:var(--green)">${fmtTime(Math.max(0, workTime))}</div>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:11px;color:var(--muted)">Przerwy (serie)</div>
+      <div style="font-size:20px;font-weight:700;color:var(--blue)">${fmtTime(totalRestSec)}</div>
+      <div style="font-size:10px;color:var(--muted)">sr. ${fmtTime(avgRest)}/seria</div>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:11px;color:var(--muted)">Przejscia (cw.)</div>
+      <div style="font-size:20px;font-weight:700;color:var(--blue)">${fmtTime(totalTransSec)}</div>
+      <div style="font-size:10px;color:var(--muted)">sr. ${fmtTime(avgTrans)}/przejscie</div>
+    </div>
+  </div>`;
+
+  // Main stats
+  html += `<div class="summary-stat"><span class="label">Cwiczenia</span><span class="value">${exBreakdown.filter(e=>e.sets>0).length} / ${exercises.length}</span></div>
+    <div class="summary-stat"><span class="label">Serie</span><span class="value">${totalSets}</span></div>
+    <div class="summary-stat"><span class="label">Wolumen calkowity</span><span class="value">${Math.round(totalVolume)} kg</span></div>`;
+
+  // Per-exercise breakdown
+  html += '<div style="margin-top:20px"><div style="font-size:14px;font-weight:700;margin-bottom:10px;color:var(--accent)">Rozklad cwiczen</div>';
+  exBreakdown.forEach(eb => {
+    if (!eb.detail.length) return;
+    html += `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:6px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px">${eb.name}</div>
+      <div style="font-size:12px;color:var(--muted)">${eb.detail.join(' → ')}</div>
+      <div style="display:flex;gap:12px;margin-top:4px;font-size:11px">
+        ${eb.type==='weight'?`<span style="color:var(--accent)">Max: ${eb.maxWeight}kg</span><span style="color:var(--green)">Vol: ${Math.round(eb.vol)}kg</span>`:''}
+        ${eb.restCount?`<span style="color:var(--blue)">Rest: ${fmtTime(eb.restSec)} (sr. ${fmtTime(Math.round(eb.restSec/eb.restCount))})</span>`:''}
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+
+  // Transitions detail
+  if (transItems.length) {
+    html += '<div style="margin-top:16px"><div style="font-size:14px;font-weight:700;margin-bottom:8px;color:var(--blue)">Przerwy miedzy cwiczeniami</div>';
+    transItems.forEach(t => {
+      html += `<div style="font-size:12px;color:var(--muted);padding:3px 0">${t.from} → ${t.to}: <strong style="color:var(--text)">${fmtTime(t.sec)}</strong></div>`;
     });
-    transHtml += '</div>';
+    html += '</div>';
   }
 
-  document.getElementById('summaryOverlay').innerHTML = `
-    <h2>Trening zakonczony!</h2>
-    <div class="summary-stat">
-      <span class="label">Czas treningu</span>
-      <span class="value">${fmtTime(totalTime)}</span>
-    </div>
-    <div class="summary-stat">
-      <span class="label">Serie</span>
-      <span class="value">${totalSets}</span>
-    </div>
-    <div class="summary-stat">
-      <span class="label">Wolumen</span>
-      <span class="value">${Math.round(totalVolume)} kg</span>
-    </div>
-    ${compHtml}
-    ${transHtml}
-    <button class="summary-close" onclick="closeSummary()">Zamknij</button>
-  `;
+  // Comparison
+  html += compHtml;
+
+  html += '<button class="summary-close" onclick="closeSummary()">Zamknij</button>';
+
+  document.getElementById('summaryOverlay').innerHTML = html;
   document.getElementById('summaryOverlay').classList.add('show');
 }
 
