@@ -594,14 +594,14 @@ async function syncToGist() {
     if (gistId) {
       res = await fetch(`https://api.github.com/gists/${gistId}`, {
         method: 'PATCH',
-        headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
     } else {
       body.public = false;
       res = await fetch('https://api.github.com/gists', {
         method: 'POST',
-        headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
     }
@@ -621,7 +621,7 @@ async function restoreFromGist() {
   if (!token || !gistId) { alert('Brak tokena lub ID backupu'); return; }
   try {
     const res = await fetch(`https://api.github.com/gists/${gistId}`, {
-      headers: { 'Authorization': `token ${token}` }
+      headers: { 'Authorization': `Bearer ${token}` }
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
