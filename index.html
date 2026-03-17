@@ -367,19 +367,36 @@ body {
 <div id="historyView" class="history-view"></div>
 
 <div id="settingsView" class="settings-view">
-  <h2>Ustawienia</h2>
+  <h2>Cloud Backup</h2>
+  <div style="margin-bottom:16px">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:8px">GitHub Token (wklej raz, dane syncują się automatycznie)</div>
+    <div style="display:flex;gap:8px">
+      <input class="set-input" type="password" id="tokenInput" placeholder="github_pat_..." style="text-align:left;flex:1">
+      <button class="s-btn" style="width:auto;margin:0;padding:10px 16px" onclick="saveToken()">Zapisz</button>
+    </div>
+    <div id="syncStatus" style="font-size:12px;margin-top:6px;min-height:18px"></div>
+  </div>
+  <button class="s-btn" onclick="syncToGist()">
+    Wymus sync teraz
+    <div class="s-desc">Zapisz dane do GitHub Gist</div>
+  </button>
+  <button class="s-btn" onclick="restoreFromGist()">
+    Przywroc z backupu
+    <div class="s-desc">Odzyskaj dane po wyczyszczeniu przegladarki</div>
+  </button>
+  <h2 style="margin-top:24px">Lokalnie</h2>
   <button class="s-btn" onclick="exportData()">
     Eksport danych (JSON)
-    <div class="s-desc">Pobierz plik z calą historią treningów</div>
+    <div class="s-desc">Pobierz plik z cala historia treningow</div>
   </button>
   <button class="s-btn" onclick="document.getElementById('importInput').click()">
     Import danych
-    <div class="s-desc">Wczytaj wcześniej wyeksportowane dane</div>
+    <div class="s-desc">Wczytaj wczesniej wyeksportowane dane</div>
   </button>
   <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)">
   <button class="s-btn danger" onclick="clearData()">
-    Wyczyść wszystkie dane
-    <div class="s-desc">Usuwa całą historię treningów</div>
+    Wyczysc wszystkie dane
+    <div class="s-desc">Usuwa cala historie treningow</div>
   </button>
 </div>
 
@@ -534,6 +551,101 @@ function loadNotes(exId, date) {
 function saveNotes(exId, date, text) {
   if (text) localStorage.setItem(`n_${exId}_${date}`, text);
   else localStorage.removeItem(`n_${exId}_${date}`);
+  scheduleSyncToGist();
+}
+
+// === GIST CLOUD BACKUP ===
+const GIST_FILENAME = 'trening-backup.json';
+let syncTimeout = null;
+
+function getToken() { return localStorage.getItem('gh_token'); }
+function setToken(t) { localStorage.setItem('gh_token', t); }
+function getGistId() { return localStorage.getItem('gist_id'); }
+function setGistId(id) { localStorage.setItem('gist_id', id); }
+
+function getAllTrainingData() {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key.startsWith('t_') || key.startsWith('n_')) {
+      data[key] = localStorage.getItem(key);
+    }
+  }
+  return data;
+}
+
+function scheduleSyncToGist() {
+  if (!getToken()) return;
+  clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(() => syncToGist(), 3000);
+}
+
+async function syncToGist() {
+  const token = getToken();
+  if (!token) return;
+  const data = getAllTrainingData();
+  const body = { files: {} };
+  body.files[GIST_FILENAME] = { content: JSON.stringify(data, null, 2) };
+  body.description = 'Trening backup — ' + new Date().toLocaleString('pl-PL');
+
+  try {
+    const gistId = getGistId();
+    let res;
+    if (gistId) {
+      res = await fetch(`https://api.github.com/gists/${gistId}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+    } else {
+      body.public = false;
+      res = await fetch('https://api.github.com/gists', {
+        method: 'POST',
+        headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    setGistId(json.id);
+    updateSyncStatus('ok');
+  } catch (err) {
+    console.error('Gist sync error:', err);
+    updateSyncStatus('error');
+  }
+}
+
+async function restoreFromGist() {
+  const token = getToken();
+  const gistId = getGistId();
+  if (!token || !gistId) { alert('Brak tokena lub ID backupu'); return; }
+  try {
+    const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+      headers: { 'Authorization': `token ${token}` }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    const content = json.files[GIST_FILENAME]?.content;
+    if (!content) { alert('Brak danych w backupie'); return; }
+    const data = JSON.parse(content);
+    Object.entries(data).forEach(([k, v]) => localStorage.setItem(k, v));
+    render();
+    alert('Dane przywrocone z backupu!');
+  } catch (err) {
+    alert('Blad przywracania: ' + err.message);
+  }
+}
+
+function updateSyncStatus(status) {
+  const el = document.getElementById('syncStatus');
+  if (!el) return;
+  if (status === 'ok') {
+    el.textContent = 'Zsynchronizowano ' + new Date().toLocaleTimeString('pl-PL');
+    el.style.color = 'var(--green)';
+  } else {
+    el.textContent = 'Blad synchronizacji';
+    el.style.color = 'var(--red)';
+  }
 }
 
 // === YOUTUBE EMBED ===
@@ -668,6 +780,7 @@ function onSetChange(exIdx, setNum, field, value) {
   if (!saved[`s${setNum}`]) saved[`s${setNum}`] = {};
   saved[`s${setNum}`][field] = value;
   saveSets(ex.id, currentDate, saved);
+  scheduleSyncToGist();
 }
 
 function toggleDone(exIdx, setNum) {
@@ -676,6 +789,7 @@ function toggleDone(exIdx, setNum) {
   if (!saved[`s${setNum}`]) saved[`s${setNum}`] = {};
   saved[`s${setNum}`].done = !saved[`s${setNum}`].done;
   saveSets(ex.id, currentDate, saved);
+  scheduleSyncToGist();
   render();
 }
 
@@ -869,8 +983,21 @@ document.addEventListener('touchend', e => {
   }
 }, { passive: true });
 
+// === TOKEN ===
+function saveToken() {
+  const val = document.getElementById('tokenInput').value.trim();
+  if (!val) { alert('Wklej token'); return; }
+  setToken(val);
+  document.getElementById('tokenInput').value = '';
+  syncToGist();
+}
+
 // === INIT ===
 render();
+if (getToken()) {
+  document.getElementById('syncStatus').textContent = 'Cloud backup aktywny';
+  document.getElementById('syncStatus').style.color = 'var(--green)';
+}
 </script>
 </body>
 </html>
