@@ -823,16 +823,29 @@ function renderHistory(){
       const saved=loadSets(ex.id,date);const notes=loadNotes(ex.id,date);
       if(!saved&&!notes)return;
       let setsText=[];
+      let hasDone=false;
       for(let s=1;s<=ex.sets;s++){const d=saved?.[`s${s}`];if(!d)continue;
-        if(ex.type==='time'){if(ex.bilateral){if(d.left||d.right)setsText.push(`S${s}: ${d.left||'—'}s L/${d.right||'—'}s R`)}else{if(d.time)setsText.push(`S${s}: ${d.time}s`)}}
-        else{const restTxt=d.rest?` (${fmtTime(d.rest)})`:'';if(ex.bilateral){if(d.weight||d.repsL||d.repsR)setsText.push(`S${s}: ${d.weight||'—'}kg×${d.repsL||'—'}L/${d.repsR||'—'}R${restTxt}`)}else{if(d.weight||d.reps)setsText.push(`S${s}: ${d.weight||'—'}kg×${d.reps||'—'}${restTxt}`)}}}
-      if(setsText.length||notes){entries+=`<div class="history-entry"><div class="h-name">${ex.name}</div>
+        if(d.done)hasDone=true;
+        if(ex.type==='time'){if(ex.bilateral){setsText.push(`S${s}: ${d.left||'—'}/${d.right||'—'}s`)}else{setsText.push(`S${s}: ${d.time||'—'}s`)}}
+        else{const restTxt=d.rest?` (${fmtTime(d.rest)})`:'';if(ex.bilateral){setsText.push(`S${s}: ${d.weight||'—'}kg×${d.repsL||'—'}L/${d.repsR||'—'}R${restTxt}`)}else{setsText.push(`S${s}: ${d.weight||'—'}kg×${d.reps||'—'}${restTxt}`)}}}
+      if(setsText.length||notes||hasDone){entries+=`<div class="history-entry"><div class="h-name">${ex.name}</div>
         ${setsText.length?`<div class="h-sets">${setsText.join(' | ')}</div>`:''}
         ${notes?`<div class="h-notes">${notes}</div>`:''}</div>`}
     });
-    if(entries)html+=`<div class="history-date">${formatDate(date)}</div>${sessInfo}${entries}`;
+    if(entries)html+=`<div class="history-date">${formatDate(date)} <button onclick="deleteTraining('${date}')" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;margin-left:8px">usun</button></div>${sessInfo}${entries}`;
   });
   document.getElementById('historyView').innerHTML=html;
+}
+
+function deleteTraining(date) {
+  if (!confirm(`Usunac trening z ${formatDate(date)}?`)) return;
+  exercises.forEach(ex => {
+    localStorage.removeItem(getKey(ex.id, date));
+    localStorage.removeItem(`n_${ex.id}_${date}`);
+  });
+  localStorage.removeItem(`sess_${date}`);
+  scheduleSyncToGist();
+  renderHistory();
 }
 
 // Export/Import
