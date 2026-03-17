@@ -28,6 +28,8 @@ body {
   min-height: 100dvh;
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
+  max-width: 480px;
+  margin: 0 auto;
 }
 
 .header {
@@ -45,7 +47,7 @@ body {
 /* Session bar */
 .session-bar {
   display: flex; align-items: center; gap: 8px;
-  margin-top: 8px;
+  margin-top: 8px; flex-wrap: wrap;
 }
 .session-btn {
   padding: 6px 14px;
@@ -56,12 +58,23 @@ body {
   cursor: pointer;
 }
 .session-btn.start-session { background: var(--green); color: #000; }
-.session-btn.end-session { background: var(--red); color: #fff; }
+.session-btn.end-session {
+  background: var(--red); color: #fff;
+  padding: 10px 20px; font-size: 15px;
+  border-radius: 10px;
+}
+.session-btn.pause-session { background: var(--accent); color: #000; }
+.session-btn.resume-session { background: var(--blue); color: #000; }
+.session-btn.add-past { background: var(--card); color: var(--accent); border: 1px solid var(--accent); }
 .session-timer {
   font-size: 14px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--accent);
+}
+.session-timer.paused {
+  color: var(--muted);
+  animation: pulse 1.5s infinite;
 }
 .session-timer.transition {
   color: var(--blue);
@@ -103,7 +116,7 @@ body {
   background: #000; margin-bottom: 16px;
 }
 .video-wrap.landscape { padding-bottom: 56.25%; }
-.video-wrap.portrait { padding-bottom: 140%; max-width: 240px; margin-left: auto; margin-right: auto; }
+.video-wrap.portrait { padding-bottom: 100%; max-width: 200px; margin-left: auto; margin-right: auto; }
 .video-wrap iframe {
   position: absolute; top: 0; left: 0;
   width: 100%; height: 100%; border: 0;
@@ -138,7 +151,7 @@ body {
   cursor: pointer; flex-shrink: 0;
 }
 .done-btn.checked { background: var(--green); border-color: var(--green); }
-.done-btn.checked::after { content: '✓'; color: #000; font-weight: 700; font-size: 15px; }
+.done-btn.checked::after { content: '\2713'; color: #000; font-weight: 700; font-size: 15px; }
 
 .rest-btn {
   font-size: 11px; color: var(--muted); background: var(--bg);
@@ -215,12 +228,17 @@ body {
   width: 34px; height: 34px; border-radius: 8px; font-size: 16px;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
+.date-nav button.hidden { visibility: hidden; pointer-events: none; }
 .date-nav .date-label { font-size: 14px; font-weight: 600; min-width: 130px; text-align: center; }
 
 .history-view { display: none; padding: 12px; padding-bottom: 100px; }
 .history-view.active { display: block; }
 .history-view h2 { font-size: 18px; margin-bottom: 12px; }
-.history-date { font-size: 14px; font-weight: 700; color: var(--accent); margin-bottom: 6px; margin-top: 16px; }
+.history-date {
+  font-size: 14px; font-weight: 700; color: var(--accent); margin-bottom: 6px; margin-top: 16px;
+  cursor: pointer;
+}
+.history-date:hover { text-decoration: underline; }
 .history-entry { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-bottom: 6px; }
 .history-entry .h-name { font-weight: 600; font-size: 14px; margin-bottom: 3px; }
 .history-entry .h-sets { font-size: 13px; color: var(--muted); line-height: 1.4; }
@@ -233,6 +251,7 @@ body {
   -webkit-backdrop-filter: blur(12px); border-top: 1px solid var(--border);
   padding: 6px 16px; padding-bottom: calc(env(safe-area-inset-bottom) + 6px);
   display: flex; justify-content: space-around;
+  max-width: 480px; margin: 0 auto;
 }
 .bar-btn {
   display: flex; flex-direction: column; align-items: center; gap: 1px;
@@ -294,9 +313,9 @@ body {
 </div>
 
 <div id="dateNavContainer" class="date-nav">
-  <button onclick="changeDate(-1)">&larr;</button>
+  <button id="dateNavPrev" onclick="changeDate(-1)">&larr;</button>
   <div class="date-label" id="dateLabel"></div>
-  <button onclick="changeDate(1)">&rarr;</button>
+  <button id="dateNavNext" onclick="changeDate(1)">&rarr;</button>
 </div>
 
 <div id="tabsContainer" class="tabs"></div>
@@ -326,20 +345,20 @@ body {
 <div class="summary-overlay" id="summaryOverlay"></div>
 
 <div class="bottom-bar">
-  <button class="bar-btn active" id="btnTrening" onclick="showView('trening')"><span class="icon">💪</span>Trening</button>
-  <button class="bar-btn" id="btnHistoria" onclick="showView('historia')"><span class="icon">📊</span>Historia</button>
-  <button class="bar-btn" id="btnUstawienia" onclick="showView('ustawienia')"><span class="icon">⚙️</span>Dane</button>
+  <button class="bar-btn active" id="btnTrening" onclick="showView('trening')"><span class="icon">&#128170;</span>Trening</button>
+  <button class="bar-btn" id="btnHistoria" onclick="showView('historia')"><span class="icon">&#128202;</span>Historia</button>
+  <button class="bar-btn" id="btnUstawienia" onclick="showView('ustawienia')"><span class="icon">&#9881;&#65039;</span>Dane</button>
 </div>
 
 <script>
 const exercises = [
-  { id:'glute-bridge', name:'ISO Hold Glute Bridge', params:'2 serie × 30-45s / strona', video:'https://www.youtube.com/shorts/PZinEf_K2UY', portrait:true, sets:2, type:'time', bilateral:true },
-  { id:'bird-dog', name:'ISO Hold Bird Dog', detail:'Bark cofniety', params:'2 serie × 45s / strona', video:'https://youtu.be/GwBprD9TLP4', portrait:false, sets:2, type:'time', bilateral:true },
-  { id:'squat-deadlift', name:'Back Squat / Trap Bar Deadlift', detail:'2 powtorzenia w zapasie', params:'3 serie × 5 powtorzen', video:'https://youtube.com/shorts/JfhNkNz59lI', portrait:true, sets:3, type:'weight', bilateral:false },
-  { id:'landmine-press', name:'Landmine Press', detail:'Standing lub kneeling', params:'3 serie × 8 powt. / strona', video:'https://youtu.be/hhQdExaLUuU', portrait:false, sets:3, type:'weight', bilateral:true },
-  { id:'lat-pulldown', name:'Lat Pull Down', params:'3 serie × 6-8 powtorzen', video:'https://www.youtube.com/shorts/bNmvKpJSWKM', portrait:true, sets:3, type:'weight', bilateral:false },
-  { id:'cable-rotation', name:'Lying Cable Rotation', params:'2-3 serie × 10-12 powt.', video:'https://www.youtube.com/watch?v=QulOwsv5QLM', portrait:false, sets:3, type:'weight', bilateral:false },
-  { id:'leg-curl', name:'Lying Leg Curl Machine', params:'3 serie × 10-12 powtorzen', video:'https://www.youtube.com/shorts/I3MdbhUBZ1Q', portrait:true, sets:3, type:'weight', bilateral:false }
+  { id:'glute-bridge', name:'ISO Hold Glute Bridge', params:'2 serie \u00d7 30-45s / strona', video:'https://www.youtube.com/shorts/PZinEf_K2UY', portrait:true, sets:2, type:'time', bilateral:true },
+  { id:'bird-dog', name:'ISO Hold Bird Dog', detail:'Bark cofniety', params:'2 serie \u00d7 45s / strona', video:'https://youtu.be/GwBprD9TLP4', portrait:false, sets:2, type:'time', bilateral:true },
+  { id:'squat-deadlift', name:'Back Squat / Trap Bar Deadlift', detail:'2 powtorzenia w zapasie', params:'3 serie \u00d7 5 powtorzen', video:'https://youtube.com/shorts/JfhNkNz59lI', portrait:true, sets:3, type:'weight', bilateral:false },
+  { id:'landmine-press', name:'Landmine Press', detail:'Standing lub kneeling', params:'3 serie \u00d7 8 powt. / strona', video:'https://youtu.be/hhQdExaLUuU', portrait:false, sets:3, type:'weight', bilateral:true },
+  { id:'lat-pulldown', name:'Lat Pull Down', params:'3 serie \u00d7 6-8 powtorzen', video:'https://www.youtube.com/shorts/bNmvKpJSWKM', portrait:true, sets:3, type:'weight', bilateral:false },
+  { id:'cable-rotation', name:'Lying Cable Rotation', params:'2-3 serie \u00d7 10-12 powt.', video:'https://www.youtube.com/watch?v=QulOwsv5QLM', portrait:false, sets:3, type:'weight', bilateral:false },
+  { id:'leg-curl', name:'Lying Leg Curl Machine', params:'3 serie \u00d7 10-12 powtorzen', video:'https://www.youtube.com/shorts/I3MdbhUBZ1Q', portrait:true, sets:3, type:'weight', bilateral:false }
 ];
 
 let currentDate = todayStr();
@@ -351,6 +370,10 @@ let sessionInterval = null;
 let transitionInterval = null;
 let transitionStartTime = null;
 let isInTransition = false;
+
+// Pause state
+let sessionPausedAt = null;
+let sessionPausedTotal = 0;
 
 function todayStr() { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function formatDate(str) { const [y,m,d]=str.split('-'); const days=['Niedz','Pon','Wt','Sr','Czw','Pt','Sob']; return `${days[new Date(+y,+m-1,+d).getDay()]} ${d}.${m}.${y}`; }
@@ -375,7 +398,7 @@ function getGistId(){return localStorage.getItem('gist_id')}
 function setGistId(id){localStorage.setItem('gist_id',id)}
 function getAllTrainingData(){const d={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k.startsWith('t_')||k.startsWith('n_')||k.startsWith('sess_'))d[k]=localStorage.getItem(k)}return d}
 function scheduleSyncToGist(){if(!getToken())return;clearTimeout(syncTimeout);syncTimeout=setTimeout(()=>syncToGist(),3000)}
-async function syncToGist(){const token=getToken();if(!token)return;const data=getAllTrainingData();const body={files:{}};body.files[GIST_FILENAME]={content:JSON.stringify(data,null,2)};body.description='Trening backup — '+new Date().toLocaleString('pl-PL');try{const gistId=getGistId();let res;if(gistId){res=await fetch(`https://api.github.com/gists/${gistId}`,{method:'PATCH',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body)})}else{body.public=false;res=await fetch('https://api.github.com/gists',{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body)})}if(!res.ok)throw new Error(`HTTP ${res.status}`);const json=await res.json();setGistId(json.id);updateSyncStatus('ok')}catch(err){console.error('Gist sync error:',err);updateSyncStatus('error')}}
+async function syncToGist(){const token=getToken();if(!token)return;const data=getAllTrainingData();const body={files:{}};body.files[GIST_FILENAME]={content:JSON.stringify(data,null,2)};body.description='Trening backup \u2014 '+new Date().toLocaleString('pl-PL');try{const gistId=getGistId();let res;if(gistId){res=await fetch(`https://api.github.com/gists/${gistId}`,{method:'PATCH',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body)})}else{body.public=false;res=await fetch('https://api.github.com/gists',{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body)})}if(!res.ok)throw new Error(`HTTP ${res.status}`);const json=await res.json();setGistId(json.id);updateSyncStatus('ok')}catch(err){console.error('Gist sync error:',err);updateSyncStatus('error')}}
 async function restoreFromGist(){const token=getToken();const gistId=getGistId();if(!token||!gistId){alert('Brak tokena lub ID backupu');return}try{const res=await fetch(`https://api.github.com/gists/${gistId}`,{headers:{'Authorization':`Bearer ${token}`}});if(!res.ok)throw new Error(`HTTP ${res.status}`);const json=await res.json();const content=json.files[GIST_FILENAME]?.content;if(!content){alert('Brak danych w backupie');return}const data=JSON.parse(content);Object.entries(data).forEach(([k,v])=>localStorage.setItem(k,v));render();alert('Przywrocono!')}catch(err){alert('Blad: '+err.message)}}
 function updateSyncStatus(s){const el=document.getElementById('syncStatus');if(!el)return;if(s==='ok'){el.textContent='Zsync '+new Date().toLocaleTimeString('pl-PL');el.style.color='var(--green)'}else{el.textContent='Blad sync';el.style.color='var(--red)'}}
 
@@ -398,25 +421,54 @@ function findPrevData(exId, beforeDate, count) {
 // === SESSION MANAGEMENT ===
 function startSession() {
   sessionStartTime = Date.now();
+  sessionPausedAt = null;
+  sessionPausedTotal = 0;
   const sess = loadSession(currentDate) || {};
   sess.startTime = sessionStartTime;
+  sess.pausedTotal = 0;
   sess.transitions = sess.transitions || {};
   saveSession(currentDate, sess);
   sessionInterval = setInterval(updateSessionTimer, 1000);
   render();
 }
 
+function getSessionElapsed() {
+  if (!sessionStartTime) return 0;
+  const now = sessionPausedAt ? sessionPausedAt : Date.now();
+  return Math.floor((now - sessionStartTime - sessionPausedTotal * 1000) / 1000);
+}
+
 function updateSessionTimer() {
   if (!sessionStartTime) return;
-  const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+  const elapsed = getSessionElapsed();
   const el = document.getElementById('sessionTime');
   if (el) el.textContent = fmtTime(elapsed);
 }
 
-function startTransition(fromIdx) {
+function pauseSession() {
+  if (!sessionStartTime || sessionPausedAt) return;
+  sessionPausedAt = Date.now();
+  clearInterval(sessionInterval);
+  sessionInterval = null;
+  render();
+}
+
+function resumeSession() {
+  if (!sessionStartTime || !sessionPausedAt) return;
+  const pausedMs = Date.now() - sessionPausedAt;
+  sessionPausedTotal += pausedMs / 1000;
+  sessionPausedAt = null;
+  sessionInterval = setInterval(updateSessionTimer, 1000);
+  render();
+}
+
+function startTransition(fromIdx, toIdx) {
   isInTransition = true;
   transitionStartTime = Date.now();
   document.getElementById('transitionBanner').classList.add('show');
+  // Store the indices for later use in stopTransition
+  startTransition._fromIdx = fromIdx;
+  startTransition._toIdx = toIdx;
   transitionInterval = setInterval(() => {
     const elapsed = Math.floor((Date.now() - transitionStartTime) / 1000);
     document.getElementById('transitionTime').textContent = fmtTime(elapsed);
@@ -432,11 +484,14 @@ function stopTransition() {
   isInTransition = false;
   document.getElementById('transitionBanner').classList.remove('show');
 
-  // Save transition time
+  // Save transition time using stored indices
   const sess = loadSession(currentDate) || {};
   if (!sess.transitions) sess.transitions = {};
-  const prevIdx = activeExercise > 0 ? activeExercise - 1 : 0;
-  sess.transitions[`${prevIdx}-${activeExercise}`] = elapsed;
+  const fromIdx = startTransition._fromIdx;
+  const toIdx = startTransition._toIdx;
+  if (fromIdx !== undefined && toIdx !== undefined) {
+    sess.transitions[`${fromIdx}-${toIdx}`] = elapsed;
+  }
   saveSession(currentDate, sess);
   return elapsed;
 }
@@ -469,9 +524,9 @@ function saveExercise(exIdx) {
   scheduleSyncToGist();
 
   if (exIdx < exercises.length - 1) {
-    // Start transition timer, move to next
-    startTransition(exIdx);
-    activeExercise = exIdx + 1;
+    const nextIdx = exIdx + 1;
+    startTransition(exIdx, nextIdx);
+    activeExercise = nextIdx;
     render();
     window.scrollTo(0, 0);
   } else {
@@ -489,28 +544,32 @@ function finishSession() {
   const sess = loadSession(currentDate) || {};
   sess.endTime = Date.now();
   if (sessionStartTime) {
-    sess.totalSeconds = Math.floor((sess.endTime - sessionStartTime) / 1000);
+    // Subtract paused time
+    const totalPausedMs = sessionPausedTotal * 1000 + (sessionPausedAt ? Date.now() - sessionPausedAt : 0);
+    sess.totalSeconds = Math.floor((sess.endTime - sessionStartTime - totalPausedMs) / 1000);
+    sess.pausedTotal = Math.round(totalPausedMs / 1000);
   }
   saveSession(currentDate, sess);
   clearInterval(sessionInterval);
   clearInterval(transitionInterval);
   document.getElementById('transitionBanner').classList.remove('show');
   sessionStartTime = null;
+  sessionPausedAt = null;
+  sessionPausedTotal = 0;
   isInTransition = false;
   showSummary();
 }
 
-// === SUMMARY ===
-function showSummary() {
-  const sess = loadSession(currentDate);
+// === SUMMARY (reusable for any date) ===
+function buildSummaryHtml(forDate, title) {
+  const sess = loadSession(forDate);
   const totalTime = sess?.totalSeconds || 0;
 
-  // Per-exercise breakdown
   let totalVolume = 0, totalSets = 0, totalRestSec = 0, totalRestCount = 0;
   let exBreakdown = [];
 
   exercises.forEach((ex, idx) => {
-    const saved = loadSets(ex.id, currentDate);
+    const saved = loadSets(ex.id, forDate);
     if (!saved) return;
     let exVol = 0, exSets = 0, exRestSec = 0, exRestCount = 0, exMaxWeight = 0;
     let setsDetail = [];
@@ -527,11 +586,11 @@ function showSummary() {
         if (ex.bilateral) {
           const rL = +(d.repsL||0), rR = +(d.repsR||0);
           exVol += w * (rL + rR);
-          setsDetail.push(`${w}kg × ${rL}L/${rR}R`);
+          setsDetail.push(`${w}kg \u00d7 ${rL}L/${rR}R`);
         } else {
           const r = +(d.reps||0);
           exVol += w * r;
-          setsDetail.push(`${w}kg × ${r}`);
+          setsDetail.push(`${w}kg \u00d7 ${r}`);
         }
       } else if (ex.type === 'time') {
         if (ex.bilateral) setsDetail.push(`${d.left||0}/${d.right||0}s`);
@@ -561,14 +620,15 @@ function showSummary() {
   const avgRest = totalRestCount > 0 ? Math.round(totalRestSec / totalRestCount) : 0;
   const avgTrans = transCount > 0 ? Math.round(totalTransSec / transCount) : 0;
 
-  // Compare with last session
+  // Compare with previous session
   const prevDates = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k.startsWith('sess_') && !k.endsWith(currentDate)) prevDates.push(k.replace('sess_',''));
+    if (k.startsWith('sess_') && !k.endsWith(forDate)) prevDates.push(k.replace('sess_',''));
   }
   prevDates.sort().reverse();
-  const prevDate = prevDates[0];
+  // Find most recent session BEFORE forDate
+  const prevDate = prevDates.find(d => d < forDate);
 
   let compHtml = '';
   if (prevDate) {
@@ -595,15 +655,14 @@ function showSummary() {
     const timeSign = timeDiff > 0 ? '+' : '';
 
     compHtml = `<div style="margin-top:20px;padding:12px;background:var(--card);border-radius:10px;border:1px solid var(--border)">
-      <div style="font-size:14px;font-weight:700;margin-bottom:8px;color:var(--accent)">vs ostatni trening (${formatDate(prevDate)})</div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px;color:var(--accent)">vs poprzedni trening (${formatDate(prevDate)})</div>
       <div class="summary-stat"><span class="label">Wolumen</span><span class="value ${volClass}">${volSign}${Math.round(volDiff)} kg</span></div>
       ${prevSess?.totalSeconds ? `<div class="summary-stat"><span class="label">Czas</span><span class="value ${timeClass}">${timeSign}${fmtTime(Math.abs(timeDiff))}</span></div>` : ''}`;
 
-    // Per-exercise max weight comparison
     compHtml += '<div style="margin-top:8px">';
     exercises.forEach(ex => {
       if (ex.type === 'time') return;
-      const curr = loadSets(ex.id, currentDate);
+      const curr = loadSets(ex.id, forDate);
       const prev = loadSets(ex.id, prevDate);
       if (!curr) return;
       let currMax = 0, prevMax = 0;
@@ -621,29 +680,31 @@ function showSummary() {
   }
 
   // Build summary HTML
-  let html = `<h2 style="margin-bottom:20px">Trening zakonczony!</h2>`;
+  let html = `<h2 style="margin-bottom:20px">${title}</h2>`;
 
   // Time overview
-  html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
-      <div style="font-size:11px;color:var(--muted)">Calkowity czas</div>
-      <div style="font-size:24px;font-weight:800;color:var(--accent)">${fmtTime(totalTime)}</div>
-    </div>
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
-      <div style="font-size:11px;color:var(--muted)">Czas pracy</div>
-      <div style="font-size:24px;font-weight:800;color:var(--green)">${fmtTime(Math.max(0, workTime))}</div>
-    </div>
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
-      <div style="font-size:11px;color:var(--muted)">Przerwy (serie)</div>
-      <div style="font-size:20px;font-weight:700;color:var(--blue)">${fmtTime(totalRestSec)}</div>
-      <div style="font-size:10px;color:var(--muted)">sr. ${fmtTime(avgRest)}/seria</div>
-    </div>
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
-      <div style="font-size:11px;color:var(--muted)">Przejscia (cw.)</div>
-      <div style="font-size:20px;font-weight:700;color:var(--blue)">${fmtTime(totalTransSec)}</div>
-      <div style="font-size:10px;color:var(--muted)">sr. ${fmtTime(avgTrans)}/przejscie</div>
-    </div>
-  </div>`;
+  if (totalTime > 0) {
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--muted)">Calkowity czas</div>
+        <div style="font-size:24px;font-weight:800;color:var(--accent)">${fmtTime(totalTime)}</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--muted)">Czas pracy</div>
+        <div style="font-size:24px;font-weight:800;color:var(--green)">${fmtTime(Math.max(0, workTime))}</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--muted)">Przerwy (serie)</div>
+        <div style="font-size:20px;font-weight:700;color:var(--blue)">${fmtTime(totalRestSec)}</div>
+        <div style="font-size:10px;color:var(--muted)">sr. ${fmtTime(avgRest)}/seria</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--muted)">Przejscia (cw.)</div>
+        <div style="font-size:20px;font-weight:700;color:var(--blue)">${fmtTime(totalTransSec)}</div>
+        <div style="font-size:10px;color:var(--muted)">sr. ${fmtTime(avgTrans)}/przejscie</div>
+      </div>
+    </div>`;
+  }
 
   // Main stats
   html += `<div class="summary-stat"><span class="label">Cwiczenia</span><span class="value">${exBreakdown.filter(e=>e.sets>0).length} / ${exercises.length}</span></div>
@@ -656,7 +717,7 @@ function showSummary() {
     if (!eb.detail.length) return;
     html += `<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:6px">
       <div style="font-size:13px;font-weight:700;margin-bottom:4px">${eb.name}</div>
-      <div style="font-size:12px;color:var(--muted)">${eb.detail.join(' → ')}</div>
+      <div style="font-size:12px;color:var(--muted)">${eb.detail.join(' \u2192 ')}</div>
       <div style="display:flex;gap:12px;margin-top:4px;font-size:11px">
         ${eb.type==='weight'?`<span style="color:var(--accent)">Max: ${eb.maxWeight}kg</span><span style="color:var(--green)">Vol: ${Math.round(eb.vol)}kg</span>`:''}
         ${eb.restCount?`<span style="color:var(--blue)">Rest: ${fmtTime(eb.restSec)} (sr. ${fmtTime(Math.round(eb.restSec/eb.restCount))})</span>`:''}
@@ -669,7 +730,7 @@ function showSummary() {
   if (transItems.length) {
     html += '<div style="margin-top:16px"><div style="font-size:14px;font-weight:700;margin-bottom:8px;color:var(--blue)">Przerwy miedzy cwiczeniami</div>';
     transItems.forEach(t => {
-      html += `<div style="font-size:12px;color:var(--muted);padding:3px 0">${t.from} → ${t.to}: <strong style="color:var(--text)">${fmtTime(t.sec)}</strong></div>`;
+      html += `<div style="font-size:12px;color:var(--muted);padding:3px 0">${t.from} \u2192 ${t.to}: <strong style="color:var(--text)">${fmtTime(t.sec)}</strong></div>`;
     });
     html += '</div>';
   }
@@ -677,8 +738,19 @@ function showSummary() {
   // Comparison
   html += compHtml;
 
-  html += '<button class="summary-close" onclick="closeSummary()">Zamknij</button>';
+  return html;
+}
 
+function showSummary() {
+  let html = buildSummaryHtml(currentDate, 'Trening zakonczony!');
+  html += '<button class="summary-close" onclick="closeSummary()">Zamknij</button>';
+  document.getElementById('summaryOverlay').innerHTML = html;
+  document.getElementById('summaryOverlay').classList.add('show');
+}
+
+function showSummaryForDate(date) {
+  let html = buildSummaryHtml(date, `Podsumowanie: ${formatDate(date)}`);
+  html += '<button class="summary-close" onclick="closeSummary()">Zamknij</button>';
   document.getElementById('summaryOverlay').innerHTML = html;
   document.getElementById('summaryOverlay').classList.add('show');
 }
@@ -729,14 +801,42 @@ function render() {
   document.getElementById('dateLabel').textContent = formatDate(currentDate);
   const isToday = currentDate === todayStr();
 
+  // Date nav arrows — hide when session is active
+  const prevBtn = document.getElementById('dateNavPrev');
+  const nextBtn = document.getElementById('dateNavNext');
+  if (sessionStartTime !== null) {
+    prevBtn.classList.add('hidden');
+    nextBtn.classList.add('hidden');
+  } else {
+    prevBtn.classList.remove('hidden');
+    nextBtn.classList.remove('hidden');
+  }
+
   // Session bar
   const sessBar = document.getElementById('sessionBar');
   if (isToday && !sessionStartTime) {
     sessBar.innerHTML = `<button class="session-btn start-session" onclick="startSession()">Rozpocznij trening</button>`;
+  } else if (sessionStartTime && sessionPausedAt) {
+    // Paused state
+    const elapsed = getSessionElapsed();
+    sessBar.innerHTML = `<span class="session-timer paused" id="sessionTime">${fmtTime(elapsed)}</span>
+      <span style="font-size:11px;color:var(--muted)">PAUZA</span>
+      <button class="session-btn resume-session" onclick="resumeSession()">Wznow</button>
+      <button class="session-btn end-session" onclick="finishSession()">Zakoncz trening</button>`;
   } else if (sessionStartTime) {
+    // Active session
     sessBar.innerHTML = `<span class="session-timer" id="sessionTime">0:00</span>
-      <button class="session-btn end-session" onclick="finishSession()">Zakoncz</button>`;
+      <button class="session-btn pause-session" onclick="pauseSession()">Pauza</button>
+      <button class="session-btn end-session" onclick="finishSession()">Zakoncz trening</button>`;
     updateSessionTimer();
+  } else if (!isToday) {
+    // Past date — show "Dodaj dane" or completed session info
+    const sess = loadSession(currentDate);
+    if (sess?.totalSeconds) {
+      sessBar.innerHTML = `<span style="font-size:12px;color:var(--green)">Trening: ${fmtTime(sess.totalSeconds)}</span>`;
+    } else {
+      sessBar.innerHTML = `<button class="session-btn add-past">Dodaj dane</button>`;
+    }
   } else {
     const sess = loadSession(currentDate);
     sessBar.innerHTML = sess?.totalSeconds ? `<span style="font-size:12px;color:var(--green)">Trening: ${fmtTime(sess.totalSeconds)}</span>` : '';
@@ -777,8 +877,8 @@ function render() {
         let parts = [];
         for (let s=1;s<=ex.sets;s++){
           const d=prev.data[`s${s}`]; if(!d)continue;
-          if(ex.type==='time'){if(ex.bilateral)parts.push(`${d.left||'—'}/${d.right||'—'}s`);else if(d.time)parts.push(`${d.time}s`)}
-          else{if(ex.bilateral)parts.push(`${d.weight||'—'}kg×${d.repsL||'—'}/${d.repsR||'—'}`);else parts.push(`${d.weight||'—'}kg×${d.reps||'—'}`)}
+          if(ex.type==='time'){if(ex.bilateral)parts.push(`${d.left||'\u2014'}/${d.right||'\u2014'}s`);else if(d.time)parts.push(`${d.time}s`)}
+          else{if(ex.bilateral)parts.push(`${d.weight||'\u2014'}kg\u00d7${d.repsL||'\u2014'}/${d.repsR||'\u2014'}`);else parts.push(`${d.weight||'\u2014'}kg\u00d7${d.reps||'\u2014'}`)}
         }
         if(parts.length) prevHtml=`<div class="prev-data">Ostatnio (${formatDate(prev.date)}): ${parts.join(' | ')}</div>`;
       }
@@ -794,7 +894,7 @@ function render() {
       </div>`;
     }
 
-    // Sets
+    // Sets — consistent layout: label, inputs, spacer, rest-btn, done-btn
     let setsHtml = '';
     for(let s=1;s<=ex.sets;s++){
       const sd=saved[`s${s}`]||{};
@@ -806,7 +906,7 @@ function render() {
         setsHtml+=`<div class="set-row"><span class="set-label">S${s}</span>
           <span class="side-label">L</span><input class="${ic(sd.left)}" type="number" inputmode="numeric" placeholder="sek" value="${sd.left||''}" onchange="onSetChange(${i},${s},'left',this.value)">
           <span class="side-label">R</span><input class="${ic(sd.right)}" type="number" inputmode="numeric" placeholder="sek" value="${sd.right||''}" onchange="onSetChange(${i},${s},'right',this.value)">
-          ${restBtn}<button class="done-btn ${sd.done?'checked':''}" onclick="toggleDone(${i},${s})"></button></div>`;
+          <span class="set-spacer"></span>${restBtn}<button class="done-btn ${sd.done?'checked':''}" onclick="toggleDone(${i},${s})"></button></div>`;
       } else if(ex.type==='time'){
         setsHtml+=`<div class="set-row"><span class="set-label">S${s}</span>
           <input class="${ic(sd.time)}" type="number" inputmode="numeric" placeholder="sek" value="${sd.time||''}" onchange="onSetChange(${i},${s},'time',this.value)">
@@ -816,13 +916,13 @@ function render() {
         setsHtml+=`<div class="set-row"><span class="set-label">S${s}</span>
           <input class="${ic(sd.weight)}" type="number" inputmode="decimal" placeholder="kg" value="${sd.weight||''}" onchange="onSetChange(${i},${s},'weight',this.value)">
           <span class="set-unit">kg</span>
-          <span class="side-label">L</span><input class="${ic(sd.repsL)}" type="number" inputmode="numeric" placeholder="×" value="${sd.repsL||''}" onchange="onSetChange(${i},${s},'repsL',this.value)" style="width:40px">
-          <span class="side-label">R</span><input class="${ic(sd.repsR)}" type="number" inputmode="numeric" placeholder="×" value="${sd.repsR||''}" onchange="onSetChange(${i},${s},'repsR',this.value)" style="width:40px">
-          ${restBtn}<button class="done-btn ${sd.done?'checked':''}" onclick="toggleDone(${i},${s})"></button></div>`;
+          <span class="side-label">L</span><input class="${ic(sd.repsL)}" type="number" inputmode="numeric" placeholder="\u00d7" value="${sd.repsL||''}" onchange="onSetChange(${i},${s},'repsL',this.value)" style="width:40px">
+          <span class="side-label">R</span><input class="${ic(sd.repsR)}" type="number" inputmode="numeric" placeholder="\u00d7" value="${sd.repsR||''}" onchange="onSetChange(${i},${s},'repsR',this.value)" style="width:40px">
+          <span class="set-spacer"></span>${restBtn}<button class="done-btn ${sd.done?'checked':''}" onclick="toggleDone(${i},${s})"></button></div>`;
       } else {
         setsHtml+=`<div class="set-row"><span class="set-label">S${s}</span>
           <input class="${ic(sd.weight)}" type="number" inputmode="decimal" placeholder="kg" value="${sd.weight||''}" onchange="onSetChange(${i},${s},'weight',this.value)">
-          <span class="set-unit">kg ×</span>
+          <span class="set-unit">kg \u00d7</span>
           <input class="${ic(sd.reps)}" type="number" inputmode="numeric" placeholder="powt" value="${sd.reps||''}" onchange="onSetChange(${i},${s},'reps',this.value)">
           <span class="set-spacer"></span>${restBtn}
           <button class="done-btn ${sd.done?'checked':''}" onclick="toggleDone(${i},${s})"></button></div>`;
@@ -830,12 +930,13 @@ function render() {
     }
 
     // Save exercise button
-    const saveBtn = (isToday && !allDone) ?
-      `<button class="action-btn save-ex" onclick="saveExercise(${i})">Zapisz cwiczenie${i<exercises.length-1?' →':''}</button>` :
-      (isToday && allDone && i===exercises.length-1 && sessionStartTime) ?
+    const canEdit = isToday || !isToday; // can always edit data
+    const saveBtn = (canEdit && !allDone) ?
+      `<button class="action-btn save-ex" onclick="saveExercise(${i})">Zapisz cwiczenie${i<exercises.length-1?' \u2192':''}</button>` :
+      (canEdit && allDone && i===exercises.length-1 && sessionStartTime) ?
       `<button class="action-btn finish" onclick="finishSession()">Zakoncz trening</button>` :
-      (isToday && allDone && i < exercises.length - 1) ? `<div style="text-align:center;margin-top:12px"><div style="color:var(--green);font-weight:700;margin-bottom:8px">✓ Zapisane</div><button class="action-btn save-ex" onclick="activeExercise=${i+1};render();window.scrollTo(0,0)">Nastepne cwiczenie →</button></div>` :
-      (isToday && allDone) ? `<div style="text-align:center;color:var(--green);font-weight:700;margin-top:12px">✓ Zapisane</div>` : '';
+      (canEdit && allDone && i < exercises.length - 1) ? `<div style="text-align:center;margin-top:12px"><div style="color:var(--green);font-weight:700;margin-bottom:8px">\u2713 Zapisane</div><button class="action-btn save-ex" onclick="activeExercise=${i+1};render();window.scrollTo(0,0)">Nastepne cwiczenie \u2192</button></div>` :
+      (canEdit && allDone) ? `<div style="text-align:center;color:var(--green);font-weight:700;margin-top:12px">\u2713 Zapisane</div>` : '';
 
     // Exercise history accordion
     let histAccHtml = '';
@@ -846,14 +947,14 @@ function render() {
         let parts = [];
         for(let s=1;s<=ex.sets;s++){
           const d=p.data[`s${s}`]; if(!d)continue;
-          if(ex.type==='time'){if(ex.bilateral)parts.push(`${d.left||'—'}/${d.right||'—'}s`);else if(d.time)parts.push(`${d.time}s`)}
-          else{if(ex.bilateral)parts.push(`${d.weight||'—'}kg×${d.repsL||'—'}/${d.repsR||'—'}`);else parts.push(`${d.weight||'—'}kg×${d.reps||'—'}`)}
+          if(ex.type==='time'){if(ex.bilateral)parts.push(`${d.left||'\u2014'}/${d.right||'\u2014'}s`);else if(d.time)parts.push(`${d.time}s`)}
+          else{if(ex.bilateral)parts.push(`${d.weight||'\u2014'}kg\u00d7${d.repsL||'\u2014'}/${d.repsR||'\u2014'}`);else parts.push(`${d.weight||'\u2014'}kg\u00d7${d.reps||'\u2014'}`)}
         }
         if(parts.length) items+=`<div class="ex-history-item"><span class="eh-date">${formatDate(p.date)}</span> ${parts.join(' | ')}</div>`;
       });
       if(items) histAccHtml=`
         <button class="ex-history-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
-          <span class="arrow">▶</span> Historia (${prevAll.length})
+          <span class="arrow">\u25b6</span> Historia (${prevAll.length})
         </button>
         <div class="ex-history-list">${items}</div>`;
     }
@@ -882,7 +983,11 @@ function render() {
 
 // Interactions
 function switchExercise(idx){activeExercise=idx;render();window.scrollTo(0,0)}
-function changeDate(delta){currentDate=dateOffset(currentDate,delta);render()}
+function changeDate(delta){
+  // Don't navigate away during active session
+  if (sessionStartTime !== null) return;
+  currentDate=dateOffset(currentDate,delta);render();
+}
 function onSetChange(exIdx,setNum,field,value){const ex=exercises[exIdx];const saved=loadSets(ex.id,currentDate)||{};if(!saved[`s${setNum}`])saved[`s${setNum}`]={};saved[`s${setNum}`][field]=value;saveSets(ex.id,currentDate,saved);scheduleSyncToGist()}
 function toggleDone(exIdx,setNum){const ex=exercises[exIdx];const saved=loadSets(ex.id,currentDate)||{};if(!saved[`s${setNum}`])saved[`s${setNum}`]={};saved[`s${setNum}`].done=!saved[`s${setNum}`].done;saveSets(ex.id,currentDate,saved);scheduleSyncToGist();render()}
 function onNotesChange(exIdx,text){saveNotes(exercises[exIdx].id,currentDate,text)}
@@ -917,13 +1022,13 @@ function renderHistory(){
       let hasDone=false;
       for(let s=1;s<=ex.sets;s++){const d=saved?.[`s${s}`];if(!d)continue;
         if(d.done)hasDone=true;
-        if(ex.type==='time'){if(ex.bilateral){setsText.push(`S${s}: ${d.left||'—'}/${d.right||'—'}s`)}else{setsText.push(`S${s}: ${d.time||'—'}s`)}}
-        else{const restTxt=d.rest?` (${fmtTime(d.rest)})`:'';if(ex.bilateral){setsText.push(`S${s}: ${d.weight||'—'}kg×${d.repsL||'—'}L/${d.repsR||'—'}R${restTxt}`)}else{setsText.push(`S${s}: ${d.weight||'—'}kg×${d.reps||'—'}${restTxt}`)}}}
+        if(ex.type==='time'){if(ex.bilateral){setsText.push(`S${s}: ${d.left||'\u2014'}/${d.right||'\u2014'}s`)}else{setsText.push(`S${s}: ${d.time||'\u2014'}s`)}}
+        else{const restTxt=d.rest?` (${fmtTime(d.rest)})`:'';if(ex.bilateral){setsText.push(`S${s}: ${d.weight||'\u2014'}kg\u00d7${d.repsL||'\u2014'}L/${d.repsR||'\u2014'}R${restTxt}`)}else{setsText.push(`S${s}: ${d.weight||'\u2014'}kg\u00d7${d.reps||'\u2014'}${restTxt}`)}}}
       if(setsText.length||notes||hasDone){entries+=`<div class="history-entry"><div class="h-name">${ex.name}</div>
         ${setsText.length?`<div class="h-sets">${setsText.join(' | ')}</div>`:''}
         ${notes?`<div class="h-notes">${notes}</div>`:''}</div>`}
     });
-    if(entries)html+=`<div class="history-date">${formatDate(date)} <button onclick="deleteTraining('${date}')" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;margin-left:8px">usun</button></div>${sessInfo}${entries}`;
+    if(entries)html+=`<div class="history-date" onclick="showSummaryForDate('${date}')">${formatDate(date)} <button onclick="event.stopPropagation();deleteTraining('${date}')" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;margin-left:8px">usun</button></div>${sessInfo}${entries}`;
   });
   document.getElementById('historyView').innerHTML=html;
 }
@@ -957,7 +1062,7 @@ function seedDemoData(){
   saveSets('lat-pulldown',d3,{s1:{weight:'45',reps:'8',done:true,rest:75},s2:{weight:'45',reps:'7',done:true,rest:80},s3:{weight:'42.5',reps:'8',done:true}});
   saveSets('cable-rotation',d3,{s1:{weight:'10',reps:'12',done:true},s2:{weight:'10',reps:'11',done:true},s3:{weight:'10',reps:'10',done:true}});
   saveSets('leg-curl',d3,{s1:{weight:'35',reps:'12',done:true},s2:{weight:'35',reps:'11',done:true},s3:{weight:'35',reps:'10',done:true}});
-  localStorage.setItem(`n_squat-deadlift_${d3}`,'Squat — kolana ok, lekko ciezko na 70kg');
+  localStorage.setItem(`n_squat-deadlift_${d3}`,'Squat \u2014 kolana ok, lekko ciezko na 70kg');
   localStorage.setItem(`n_landmine-press_${d3}`,'Prawa slabsza na ostatniej serii');
   saveSession(d3,{startTime:0,endTime:0,totalSeconds:4200,transitions:{'1-2':45,'2-3':60,'3-4':50,'4-5':40,'5-6':35}});
   const d7=dateOffset(today,-7);
