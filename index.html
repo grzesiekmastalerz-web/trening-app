@@ -97,24 +97,16 @@ body {
 .exercise-detail { color: var(--muted); font-size: 13px; margin-bottom: 2px; }
 .exercise-params { font-size: 14px; color: var(--accent); margin-bottom: 12px; font-weight: 600; }
 
-.video-thumb {
-  display: block; position: relative;
+.video-wrap {
+  position: relative; width: 100%;
   border-radius: 10px; overflow: hidden;
-  background: #111; margin-bottom: 16px;
-  text-decoration: none; max-height: 180px;
+  background: #000; margin-bottom: 16px;
 }
-.video-thumb img { width: 100%; display: block; object-fit: cover; max-height: 180px; }
-.play-badge {
-  position: absolute; top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  width: 52px; height: 52px;
-  background: rgba(255,0,0,0.9); border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-}
-.play-badge::after {
-  content: ''; width: 0; height: 0;
-  border-style: solid; border-width: 10px 0 10px 18px;
-  border-color: transparent transparent transparent #fff; margin-left: 3px;
+.video-wrap.landscape { padding-bottom: 56.25%; }
+.video-wrap.portrait { padding-bottom: 140%; max-width: 240px; margin-left: auto; margin-right: auto; }
+.video-wrap iframe {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%; border: 0;
 }
 
 .log-section { margin-top: 4px; }
@@ -134,6 +126,7 @@ body {
 }
 .set-input:focus { border-color: var(--accent); outline: none; }
 .set-input::placeholder { color: #444; font-size: 12px; }
+.set-input.empty-warn { border-color: var(--accent); background: rgba(253,222,89,0.08); }
 .set-unit { font-size: 11px; color: var(--muted); flex-shrink: 0; }
 .set-spacer { flex: 1; }
 .side-label { font-size: 11px; color: var(--muted); font-weight: 600; width: 10px; flex-shrink: 0; }
@@ -340,13 +333,13 @@ body {
 
 <script>
 const exercises = [
-  { id:'glute-bridge', name:'ISO Hold Glute Bridge', params:'2 serie × 30-45s / strona', video:'https://www.youtube.com/shorts/PZinEf_K2UY', sets:2, type:'time', bilateral:true },
-  { id:'bird-dog', name:'ISO Hold Bird Dog', detail:'Bark cofniety', params:'2 serie × 45s / strona', video:'https://youtu.be/GwBprD9TLP4', sets:2, type:'time', bilateral:true },
-  { id:'squat-deadlift', name:'Back Squat / Trap Bar Deadlift', detail:'2 powtorzenia w zapasie', params:'3 serie × 5 powtorzen', video:'https://youtube.com/shorts/JfhNkNz59lI', sets:3, type:'weight', bilateral:false },
-  { id:'landmine-press', name:'Landmine Press', detail:'Standing lub kneeling', params:'3 serie × 8 powt. / strona', video:'https://youtu.be/hhQdExaLUuU', sets:3, type:'weight', bilateral:true },
-  { id:'lat-pulldown', name:'Lat Pull Down', params:'3 serie × 6-8 powtorzen', video:'https://www.youtube.com/shorts/bNmvKpJSWKM', sets:3, type:'weight', bilateral:false },
-  { id:'cable-rotation', name:'Lying Cable Rotation', params:'2-3 serie × 10-12 powt.', video:'https://www.youtube.com/watch?v=QulOwsv5QLM', sets:3, type:'weight', bilateral:false },
-  { id:'leg-curl', name:'Lying Leg Curl Machine', params:'3 serie × 10-12 powtorzen', video:'https://www.youtube.com/shorts/I3MdbhUBZ1Q', sets:3, type:'weight', bilateral:false }
+  { id:'glute-bridge', name:'ISO Hold Glute Bridge', params:'2 serie × 30-45s / strona', video:'https://www.youtube.com/shorts/PZinEf_K2UY', portrait:true, sets:2, type:'time', bilateral:true },
+  { id:'bird-dog', name:'ISO Hold Bird Dog', detail:'Bark cofniety', params:'2 serie × 45s / strona', video:'https://youtu.be/GwBprD9TLP4', portrait:false, sets:2, type:'time', bilateral:true },
+  { id:'squat-deadlift', name:'Back Squat / Trap Bar Deadlift', detail:'2 powtorzenia w zapasie', params:'3 serie × 5 powtorzen', video:'https://youtube.com/shorts/JfhNkNz59lI', portrait:true, sets:3, type:'weight', bilateral:false },
+  { id:'landmine-press', name:'Landmine Press', detail:'Standing lub kneeling', params:'3 serie × 8 powt. / strona', video:'https://youtu.be/hhQdExaLUuU', portrait:false, sets:3, type:'weight', bilateral:true },
+  { id:'lat-pulldown', name:'Lat Pull Down', params:'3 serie × 6-8 powtorzen', video:'https://www.youtube.com/shorts/bNmvKpJSWKM', portrait:true, sets:3, type:'weight', bilateral:false },
+  { id:'cable-rotation', name:'Lying Cable Rotation', params:'2-3 serie × 10-12 powt.', video:'https://www.youtube.com/watch?v=QulOwsv5QLM', portrait:false, sets:3, type:'weight', bilateral:false },
+  { id:'leg-curl', name:'Lying Leg Curl Machine', params:'3 serie × 10-12 powtorzen', video:'https://www.youtube.com/shorts/I3MdbhUBZ1Q', portrait:true, sets:3, type:'weight', bilateral:false }
 ];
 
 let currentDate = todayStr();
@@ -449,10 +442,26 @@ function stopTransition() {
 function saveExercise(exIdx) {
   const ex = exercises[exIdx];
   const saved = loadSets(ex.id, currentDate) || {};
-  // Mark all sets as done
+  // Mark all sets as done, fill empty fields with 0
   for (let s = 1; s <= ex.sets; s++) {
     if (!saved[`s${s}`]) saved[`s${s}`] = {};
     saved[`s${s}`].done = true;
+    if (ex.type === 'time') {
+      if (ex.bilateral) {
+        if (!saved[`s${s}`].left) saved[`s${s}`].left = '0';
+        if (!saved[`s${s}`].right) saved[`s${s}`].right = '0';
+      } else {
+        if (!saved[`s${s}`].time) saved[`s${s}`].time = '0';
+      }
+    } else {
+      if (!saved[`s${s}`].weight) saved[`s${s}`].weight = '0';
+      if (ex.bilateral) {
+        if (!saved[`s${s}`].repsL) saved[`s${s}`].repsL = '0';
+        if (!saved[`s${s}`].repsR) saved[`s${s}`].repsR = '0';
+      } else {
+        if (!saved[`s${s}`].reps) saved[`s${s}`].reps = '0';
+      }
+    }
   }
   saveSets(ex.id, currentDate, saved);
   scheduleSyncToGist();
@@ -639,6 +648,9 @@ function toggleRest(exIdx,setNum){
   else startRest(exIdx,setNum);
 }
 
+// Helper: input class with warning for '0' values
+function ic(val) { return val === '0' ? 'set-input empty-warn' : 'set-input'; }
+
 // === RENDER ===
 function render() {
   document.getElementById('dateLabel').textContent = formatDate(currentDate);
@@ -673,13 +685,14 @@ function render() {
     const notes = loadNotes(ex.id, currentDate);
     const allDone = [...Array(ex.sets)].every((_,s) => saved[`s${s+1}`]?.done);
 
-    // Video
+    // Video embed
     let videoHtml = '';
     const videoId = getVideoId(ex.video);
     if (videoId) {
-      videoHtml = `<a class="video-thumb" href="${ex.video}" target="_blank" rel="noopener">
-        <img src="https://img.youtube.com/vi/${videoId}/hqdefault.jpg" alt="${ex.name}">
-        <div class="play-badge"></div></a>`;
+      const orient = ex.portrait ? 'portrait' : 'landscape';
+      videoHtml = `<div class="video-wrap ${orient}">
+        <iframe src="https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1" allowfullscreen loading="lazy"></iframe>
+      </div>`;
     }
 
     // Prev hint
@@ -714,26 +727,26 @@ function render() {
 
       if(ex.type==='time'&&ex.bilateral){
         setsHtml+=`<div class="set-row"><span class="set-label">S${s}</span>
-          <span class="side-label">L</span><input class="set-input" type="number" inputmode="numeric" placeholder="sek" value="${sd.left||''}" onchange="onSetChange(${i},${s},'left',this.value)">
-          <span class="side-label">R</span><input class="set-input" type="number" inputmode="numeric" placeholder="sek" value="${sd.right||''}" onchange="onSetChange(${i},${s},'right',this.value)">
+          <span class="side-label">L</span><input class="${ic(sd.left)}" type="number" inputmode="numeric" placeholder="sek" value="${sd.left||''}" onchange="onSetChange(${i},${s},'left',this.value)">
+          <span class="side-label">R</span><input class="${ic(sd.right)}" type="number" inputmode="numeric" placeholder="sek" value="${sd.right||''}" onchange="onSetChange(${i},${s},'right',this.value)">
           ${restBtn}<button class="done-btn ${sd.done?'checked':''}" onclick="toggleDone(${i},${s})"></button></div>`;
       } else if(ex.type==='time'){
         setsHtml+=`<div class="set-row"><span class="set-label">S${s}</span>
-          <input class="set-input" type="number" inputmode="numeric" placeholder="sek" value="${sd.time||''}" onchange="onSetChange(${i},${s},'time',this.value)">
+          <input class="${ic(sd.time)}" type="number" inputmode="numeric" placeholder="sek" value="${sd.time||''}" onchange="onSetChange(${i},${s},'time',this.value)">
           <span class="set-unit">sek</span><span class="set-spacer"></span>
           ${restBtn}<button class="done-btn ${sd.done?'checked':''}" onclick="toggleDone(${i},${s})"></button></div>`;
       } else if(ex.bilateral){
         setsHtml+=`<div class="set-row"><span class="set-label">S${s}</span>
-          <input class="set-input" type="number" inputmode="decimal" placeholder="kg" value="${sd.weight||''}" onchange="onSetChange(${i},${s},'weight',this.value)">
+          <input class="${ic(sd.weight)}" type="number" inputmode="decimal" placeholder="kg" value="${sd.weight||''}" onchange="onSetChange(${i},${s},'weight',this.value)">
           <span class="set-unit">kg</span>
-          <span class="side-label">L</span><input class="set-input" type="number" inputmode="numeric" placeholder="×" value="${sd.repsL||''}" onchange="onSetChange(${i},${s},'repsL',this.value)" style="width:40px">
-          <span class="side-label">R</span><input class="set-input" type="number" inputmode="numeric" placeholder="×" value="${sd.repsR||''}" onchange="onSetChange(${i},${s},'repsR',this.value)" style="width:40px">
+          <span class="side-label">L</span><input class="${ic(sd.repsL)}" type="number" inputmode="numeric" placeholder="×" value="${sd.repsL||''}" onchange="onSetChange(${i},${s},'repsL',this.value)" style="width:40px">
+          <span class="side-label">R</span><input class="${ic(sd.repsR)}" type="number" inputmode="numeric" placeholder="×" value="${sd.repsR||''}" onchange="onSetChange(${i},${s},'repsR',this.value)" style="width:40px">
           ${restBtn}<button class="done-btn ${sd.done?'checked':''}" onclick="toggleDone(${i},${s})"></button></div>`;
       } else {
         setsHtml+=`<div class="set-row"><span class="set-label">S${s}</span>
-          <input class="set-input" type="number" inputmode="decimal" placeholder="kg" value="${sd.weight||''}" onchange="onSetChange(${i},${s},'weight',this.value)">
+          <input class="${ic(sd.weight)}" type="number" inputmode="decimal" placeholder="kg" value="${sd.weight||''}" onchange="onSetChange(${i},${s},'weight',this.value)">
           <span class="set-unit">kg ×</span>
-          <input class="set-input" type="number" inputmode="numeric" placeholder="powt" value="${sd.reps||''}" onchange="onSetChange(${i},${s},'reps',this.value)">
+          <input class="${ic(sd.reps)}" type="number" inputmode="numeric" placeholder="powt" value="${sd.reps||''}" onchange="onSetChange(${i},${s},'reps',this.value)">
           <span class="set-spacer"></span>${restBtn}
           <button class="done-btn ${sd.done?'checked':''}" onclick="toggleDone(${i},${s})"></button></div>`;
       }
