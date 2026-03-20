@@ -399,7 +399,7 @@ function setGistId(id){localStorage.setItem('gist_id',id)}
 function getAllTrainingData(){const d={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k.startsWith('t_')||k.startsWith('n_')||k.startsWith('sess_'))d[k]=localStorage.getItem(k)}return d}
 function scheduleSyncToGist(){if(!getToken())return;clearTimeout(syncTimeout);syncTimeout=setTimeout(()=>syncToGist(),3000)}
 async function syncToGist(){const token=getToken();if(!token)return;const data=getAllTrainingData();const body={files:{}};body.files[GIST_FILENAME]={content:JSON.stringify(data,null,2)};body.description='Trening backup \u2014 '+new Date().toLocaleString('pl-PL');try{const gistId=getGistId();let res;if(gistId){res=await fetch(`https://api.github.com/gists/${gistId}`,{method:'PATCH',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body)})}else{body.public=false;res=await fetch('https://api.github.com/gists',{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body)})}if(!res.ok)throw new Error(`HTTP ${res.status}`);const json=await res.json();setGistId(json.id);updateSyncStatus('ok')}catch(err){console.error('Gist sync error:',err);updateSyncStatus('error')}}
-async function restoreFromGist(){const token=getToken();const gistId=getGistId();if(!token||!gistId){alert('Brak tokena lub ID backupu');return}try{const res=await fetch(`https://api.github.com/gists/${gistId}`,{headers:{'Authorization':`Bearer ${token}`}});if(!res.ok)throw new Error(`HTTP ${res.status}`);const json=await res.json();const content=json.files[GIST_FILENAME]?.content;if(!content){alert('Brak danych w backupie');return}const data=JSON.parse(content);Object.entries(data).forEach(([k,v])=>localStorage.setItem(k,v));render();alert('Przywrocono!')}catch(err){alert('Blad: '+err.message)}}
+async function restoreFromGist(silent=false){const token=getToken();const gistId=getGistId();if(!token||!gistId){if(!silent)alert('Brak tokena lub ID backupu');return false}try{const res=await fetch(`https://api.github.com/gists/${gistId}`,{headers:{'Authorization':`Bearer ${token}`}});if(!res.ok)throw new Error(`HTTP ${res.status}`);const json=await res.json();const content=json.files[GIST_FILENAME]?.content;if(!content){if(!silent)alert('Brak danych w backupie');return false}const data=JSON.parse(content);let merged=0;Object.entries(data).forEach(([k,v])=>{const existing=localStorage.getItem(k);if(!existing||existing!==v){localStorage.setItem(k,v);merged++}});if(merged>0){render();updateSyncStatus('ok')}if(!silent)alert('Przywrocono!');return merged>0}catch(err){if(!silent)alert('Blad: '+err.message);return false}}
 function updateSyncStatus(s){const el=document.getElementById('syncStatus');if(!el)return;if(s==='ok'){el.textContent='Zsync '+new Date().toLocaleTimeString('pl-PL');el.style.color='var(--green)'}else{el.textContent='Blad sync';el.style.color='var(--red)'}}
 
 // YouTube
@@ -1040,7 +1040,7 @@ function deleteTraining(date) {
     localStorage.removeItem(`n_${ex.id}_${date}`);
   });
   localStorage.removeItem(`sess_${date}`);
-  scheduleSyncToGist();
+  syncToGist();
   renderHistory();
 }
 
@@ -1082,9 +1082,17 @@ function seedDemoData(){
 }
 
 // Init
-seedDemoData();
-render();
-if(getToken()){document.getElementById('syncStatus').textContent='Cloud backup aktywny';document.getElementById('syncStatus').style.color='var(--green)'}
+async function init(){
+  if(getToken()&&getGistId()){
+    document.getElementById('syncStatus').textContent='Ladowanie...';
+    document.getElementById('syncStatus').style.color='var(--accent)';
+    await restoreFromGist(true);
+    document.getElementById('syncStatus').textContent='Cloud backup aktywny';
+    document.getElementById('syncStatus').style.color='var(--green)';
+  }
+  render();
+}
+init();
 </script>
 </body>
 </html>
